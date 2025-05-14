@@ -1,0 +1,55 @@
+name: Salt x InvisiRisk
+
+on:
+  schedule:
+    - cron: '45 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  checks: write
+  contents: write
+  packages: read
+  actions: write
+
+jobs:
+  sync-and-build:
+    runs-on: ubuntu-latest
+    name: Sync fork and Run build
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Set up Git
+        run: |
+          git config user.name "ir-paras-oli"
+          git config user.email "paras.oli@invisirisk.com"
+      - name: Add upstream and sync fork
+        run: |
+          git remote add upstream https://github.com/saltstack/salt.git
+          git fetch upstream
+          git checkout master
+          git merge upstream/master --no-edit
+          git push https://x-access-token:${{ secrets.MY_PAT }}@github.com/ir-paras-oli/salt master
+      - name: Setup PSE
+        uses: invisirisk/pse-action@latest
+        with:
+          api_url: "https://app.invisirisk.com"
+          app_token: ${{ secrets.IR_API_KEY }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Cleanup PSE
+        if: always()
+        uses: invisirisk/pse-action@latest
+        with:
+          cleanup: "true"
